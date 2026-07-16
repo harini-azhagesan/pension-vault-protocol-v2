@@ -25,6 +25,8 @@ try {
 const DB_FILE = path.join(__dirname, '../data/users.json');
 let memoryUsers = [];
 
+const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+
 // Load initial data from JSON if it exists
 try {
     if (fs.existsSync(DB_FILE)) {
@@ -69,19 +71,45 @@ class HybridUser {
 }
 
 // Static methods
-HybridUser.findOne = async (query) => {
+HybridUser.findOne = async (query = {}) => {
+    const normalizedQuery = { ...query };
+    if (normalizedQuery.email) {
+        normalizedQuery.email = normalizeEmail(normalizedQuery.email);
+    }
+
     if (mongoose.connection.readyState === 1) {
+        if (normalizedQuery.email) {
+            return await User.findOne({ ...query, email: { $regex: `^${String(normalizedQuery.email).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+        }
         return await User.findOne(query);
     } else {
-        return memoryUsers.find(u => Object.keys(query).every(key => u[key] === query[key]));
+        return memoryUsers.find(u => Object.keys(normalizedQuery).every(key => {
+            if (key === 'email') {
+                return normalizeEmail(u[key]) === normalizedQuery[key];
+            }
+            return u[key] === normalizedQuery[key];
+        }));
     }
 };
 
 HybridUser.find = async (query = {}) => {
+    const normalizedQuery = { ...query };
+    if (normalizedQuery.email) {
+        normalizedQuery.email = normalizeEmail(normalizedQuery.email);
+    }
+
     if (mongoose.connection.readyState === 1) {
+        if (normalizedQuery.email) {
+            return await User.find({ ...query, email: { $regex: `^${String(normalizedQuery.email).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } });
+        }
         return await User.find(query);
     } else {
-        return memoryUsers.filter(u => Object.keys(query).every(key => u[key] === query[key]));
+        return memoryUsers.filter(u => Object.keys(normalizedQuery).every(key => {
+            if (key === 'email') {
+                return normalizeEmail(u[key]) === normalizedQuery[key];
+            }
+            return u[key] === normalizedQuery[key];
+        }));
     }
 };
 

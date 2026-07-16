@@ -25,12 +25,23 @@ const Signup = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.post('/api/auth/register', formData);
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      navigate('/dashboard');
+      const response = await api.post('/api/auth/register', {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        role: formData.role,
+        organization: formData.organization.trim()
+      });
+
+      if (response?.data?.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+
+      navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      const message = err?.response?.data?.message || 'Registration failed. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -150,7 +161,8 @@ const Signup = () => {
           </div>
 
           <button 
-            type="submit"
+            type="button"
+            onClick={handleSignup}
             disabled={loading}
             className="w-full bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black py-4 rounded-xl font-bold mt-4 shadow-[0_0_20px_rgba(0,242,255,0.3)] hover:shadow-[0_0_30px_rgba(112,0,255,0.4)] hover:scale-[1.01] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
