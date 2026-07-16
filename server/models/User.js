@@ -28,13 +28,28 @@ let memoryUsers = [];
 const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
 
 // Load initial data from JSON if it exists
-try {
-    if (fs.existsSync(DB_FILE)) {
-        memoryUsers = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+const loadMemoryUsers = () => {
+    try {
+        if (fs.existsSync(DB_FILE)) {
+            return JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) || [];
+        }
+    } catch (err) {
+        console.warn('User Model: Unable to load memory users', err.message);
     }
-} catch (err) {
-    console.log('User Model: Using empty memory store');
-}
+    return [];
+};
+
+const persistMemoryUsers = (users) => {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2));
+        return true;
+    } catch (err) {
+        console.warn('User Model: Unable to persist memory users', err.message);
+        return false;
+    }
+};
+
+memoryUsers = loadMemoryUsers();
 
 // Wrapper class that chooses between Mongoose and Memory based on connection
 class HybridUser {
@@ -49,22 +64,13 @@ class HybridUser {
         if (mongoose.connection.readyState === 1) {
             return await this.instance.save();
         } else {
-            // Memory storage (fallback for Vercel read-only filesystem)
-            const newUser = { 
-                ...this.data, 
+            const newUser = {
+                ...this.data,
                 _id: Date.now().toString(),
-                createdAt: new Date() 
+                createdAt: new Date()
             };
             memoryUsers.push(newUser);
-            
-            // Try to persist to file (only works locally)
-            try {
-                if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-                    fs.writeFileSync(DB_FILE, JSON.stringify(memoryUsers, null, 2));
-                }
-            } catch (e) {
-                // Silently fail on read-only systems, data remains in RAM for this session
-            }
+            persistMemoryUsers(memoryUsers);
             return newUser;
         }
     }
